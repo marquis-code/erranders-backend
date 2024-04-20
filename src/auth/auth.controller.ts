@@ -1,60 +1,32 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Logger,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
-import { AuthGuard } from ‘@nestjs/passport’;
+import { Controller, Post, Body, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { UsersService } from 'src/users/users.service';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { LoginUserDto } from './dto/login-auth.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  logger: Logger;
-  constructor(private readonly authService: AuthService) {
-    this.logger = new Logger(AuthController.name);
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
+
+  @Post('signup')
+  async signUp(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.createUser(createUserDto);
   }
 
-  @Post()
-  create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.authService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(+id, updateAuthDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authService.remove(+id);
-  }
-
-  
-  @UseGuards(AuthGuard('login'))
+  @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(@Request() req): Promise<any> {
-  try {
-  return req.user;
-  } catch (error) {
-  throw error;
-  }
+  async login(@Body() loginUserDto: LoginUserDto, @Res() res: Response) {
+    const user = await this.authService.validateUser(
+      loginUserDto.email,
+      loginUserDto.password,
+    );
+    const jwt = await this.authService.login(user);
+    res.cookie('jwt', jwt.access_token, { httpOnly: true });
+    return res.send({ message: 'Logged in successfully', user });
   }
 }
